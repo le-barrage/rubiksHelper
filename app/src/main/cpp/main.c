@@ -1,8 +1,8 @@
 #include "deps/raylib/src/raylib.h"
-#include "deps/raymob/raymob.h"
 #include "kociemba/coordCube.h"
 #include "kociemba/enums.h"
 #include "kociemba/twoPhase.h"
+#include "ui.h"
 #include "utils.h"
 
 #include <stdbool.h>
@@ -64,23 +64,17 @@ bool debug = false;
  *             |************|
  *             |*B3**B2**B1*|
  *             |************|
-
  */
 static void toStr (char *out)
 {
     // URFDLB => 032415
     int URFDLB[] = { 0, 3, 2, 4, 1, 5 };
     int curr     = 0;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 3; j++) {
             for (int k = 0; k < 3; k++) {
                 out[curr++] = getNotationFromColor(faces[URFDLB[i]][k * 3 + j]);
             }
-        }
-    }
-    for (int j = 0; j < 3; j++) {
-        for (int k = 0; k < 3; k++) {
-            out[curr++] = getNotationFromColor(faces[URFDLB[4]][k * 3 + j]);
         }
     }
     for (int j = 2; j >= 0; j--) {
@@ -95,47 +89,12 @@ static void printMoves ()
     char str[depth * 3];
     int curr = 0;
     for (int i = 0; i < depth; i++) {
-        switch (moves[i].orientation) {
-            case FACE_UP:
-                str[curr++] = 'U';
-                break;
-            case FACE_LEFT:
-                str[curr++] = 'L';
-                break;
-            case FACE_FRONT:
-                str[curr++] = 'F';
-                break;
-            case FACE_RIGHT:
-                str[curr++] = 'R';
-                break;
-            case FACE_DOWN:
-                str[curr++] = 'D';
-                break;
-            case FACE_BACK:
-                str[curr++] = 'B';
-                break;
-            default:
-                str[curr++] = '?';
-                break;
-        }
-        switch (moves[i].direction) {
-            case ANTICW:
-                str[curr++] = '\'';
-                break;
-            case HALF:
-                str[curr++] = '2';
-                break;
-            case CW:
-                str[curr++] = '.';
-                break;
-            case NONE:
-            default:
-                str[curr++] = '?';
-                break;
-        }
+        str[curr++] = getOrientationChar(moves[i].orientation);
+        str[curr++] = getDirectionChar(moves[i].direction);
         str[curr++] = ' ';
     }
-    str[curr++]      = '\0';
+    str[curr++] = '\0';
+
     Vector2 textSize = MeasureTextEx(font, str, 50, 4);
     DrawTextEx(font, str, (Vector2){ (GetScreenWidth() - textSize.x) / 2, 2500 }, 50, 4, RAYWHITE);
 }
@@ -163,20 +122,6 @@ static void draw3x3 (int x, int y, int index)
     }
 }
 
-static bool drawButton (int x, int y, int width, int height, Color color, char *text)
-{
-    DrawRectangleRounded((Rectangle){ x, y, width, height }, 0.2, 1, color);
-
-    Vector2 textWidth = MeasureTextEx(font, text, 50, 3);
-    int textX         = x + (width - textWidth.x) / 2.f;
-    int textY         = y + (height - textWidth.y) / 2.f;
-    DrawTextEx(font, text, (Vector2){ textX, textY }, 50, 3, BLACK);
-
-    int mouse_x = GetMouseX(), mouse_y = GetMouseY();
-    return IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && x <= mouse_x && mouse_x <= x + width && y <= mouse_y
-           && mouse_y <= y + height;
-}
-
 int getFaceTouched (int px, int py)
 {
     int gridStartX = GetScreenWidth() / 2. - (squareSize * 4.5 + faceMargin);
@@ -195,18 +140,14 @@ int getFaceTouched (int px, int py)
 
     GridCoord coord = { .x = offsetX / spacing, .y = offsetY / spacing };
 
-    if (coord.y == 0) {
-        return (coord.x == 1) ? 0 : -1;
-    }
-    if (coord.y == 1 && coord.x < 3) {
-        return coord.x + 1;
-    }
-    if (coord.y == 2) {
-        return (coord.x == 1) ? 4 : -1;
-    }
-    if (coord.y == 3) {
-        return (coord.x == 1) ? 5 : -1;
-    }
+    if (coord.y == 0) return (coord.x == 1) ? 0 : -1;
+
+    if (coord.y == 1 && coord.x < 3) return coord.x + 1;
+
+    if (coord.y == 2) return (coord.x == 1) ? 4 : -1;
+
+    if (coord.y == 3) return (coord.x == 1) ? 5 : -1;
+
     return -1;
 }
 
@@ -243,16 +184,16 @@ int main (void)
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
 
-        if (drawButton(GetScreenWidth() - 200, 50, 150, 100, GetColor(0x666666FF), "DEBUG")) debug = !debug;
+        if (drawButton(GetScreenWidth() - 200, 50, 150, 100, GetColor(0x666666FF), "DEBUG", font)) debug = !debug;
 
-        if (drawButton(100, 50, 150, 100, GetColor(0x666666FF), "RESET")) {
+        if (drawButton(100, 50, 150, 100, GetColor(0x666666FF), "RESET", font)) {
             resetColors();
             depth = 0;
         }
 
         int x = GetScreenWidth() / 2. - squareSize * 3 - faceMargin * 2.5;
         for (int i = 0; i < 6; i++) {
-            if (drawButton(x, 2800, squareSize, squareSize, colors[i], ""))
+            if (drawButton(x, 2800, squareSize, squareSize, colors[i], "", font))
                 faces[selectedFace][selectedFacelet.x * 3 + selectedFacelet.y] = colors[i];
             x += squareSize + faceMargin;
         }
@@ -288,7 +229,7 @@ int main (void)
             }
         }
 
-        if (drawButton(GetScreenWidth() / 2 - 150, 2200, 300, 125, GetColor(0x9370DBFF), "SOLVE")) {
+        if (drawButton(GetScreenWidth() / 2 - 150, 2200, 300, 125, GetColor(0x9370DBFF), "SOLVE", font)) {
             toStr(str);
             err  = findSolutionBasic(str, 25, 5000, moves, &depth);
             good = true;
