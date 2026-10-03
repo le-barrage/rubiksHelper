@@ -1,3 +1,4 @@
+#include "camera.h"
 #include "deps/raylib/src/raylib.h"
 #include "kociemba/coordCube.h"
 #include "kociemba/enums.h"
@@ -35,6 +36,11 @@ int err        = 0;
 bool good      = false;
 
 bool debug = false;
+
+int scanFace;
+
+#define SCREEN_WHITE_FRAMES 5
+int screenWhite = 0;
 
 /*             |************|
  *             |*U1**U2**U3*|
@@ -191,6 +197,78 @@ int main (void)
             depth = 0;
         }
 
+        if (cameraIsActive()) {
+            if (cameraUpdate()) {
+                Texture2D tex = cameraGetTexture();
+                float scale   = (float)GetScreenWidth() / tex.width;
+                DrawTextureEx(tex, (Vector2){ 0, START_Y }, 0, scale, WHITE);
+                float w     = tex.width * scale - 400;
+                float cell  = w / 3;
+                int start_x = 200, start_y = START_Y + 200;
+                int line_width = 8;
+                DrawRectangleLinesEx((Rectangle){ 200, START_Y + 200, w, w }, line_width, BLACK);
+                DrawLineEx((Vector2){ start_x, start_y + w / 3 }, (Vector2){ start_x + w, start_y + w / 3 }, line_width,
+                           BLACK);
+                DrawLineEx((Vector2){ start_x, start_y + 2 * w / 3 }, (Vector2){ start_x + w, start_y + 2 * w / 3 },
+                           line_width, BLACK);
+                DrawLineEx((Vector2){ start_x + w / 3, start_y }, (Vector2){ start_x + w / 3, start_y + w }, line_width,
+                           BLACK);
+                DrawLineEx((Vector2){ start_x + 2 * w / 3, start_y }, (Vector2){ start_x + 2 * w / 3, start_y + w },
+                           line_width, BLACK);
+
+                if (screenWhite) {
+                    screenWhite--;
+                    DrawRectangle(
+                        0, START_Y, tex.width * scale, tex.height * scale,
+                        (Color){ WHITE.r, WHITE.g, WHITE.b, (255 / SCREEN_WHITE_FRAMES) * screenWhite });
+                }
+
+                Color scanned[9];
+                for (int col = 0; col < 3; col++) {
+                    for (int row = 0; row < 3; row++) {
+                        float cx = start_x + (col + 0.5f) * cell;
+                        float cy = start_y + (row + 0.5f) * cell;
+
+                        int tx = cx / scale;
+                        int ty = (cy - START_Y) / scale;
+
+                        Color raw              = cameraSampleColor(tx, ty, (cell / scale) / 6);
+                        scanned[col * 3 + row] = classifyColor(raw);
+
+                        DrawRectangle(cx - 25, cy - 25, 50, 50, scanned[col * 3 + row]);
+                        DrawRectangleLines(cx - 25, cy - 25, 50, 50, BLACK);
+
+                        if (debug) {
+                            Vector3 hsv = ColorToHSV(raw);
+                            DrawTextEx(font, TextFormat("H %.0f  S %.2f  V %.2f", hsv.x, hsv.y, hsv.z),
+                                       (Vector2){ start_x + 260, start_y + w + (col * 3 + row) * 70 }, 50, 3, RAYWHITE);
+                        }
+                    }
+                }
+
+                const char *names = "ULFRDB";
+                DrawTextEx(font, TextFormat("Show face %c", names[scanFace]), (Vector2){ start_x, start_y + w + 40 },
+                           75, 4, RAYWHITE);
+
+                if (drawButton(GetScreenWidth() / 2 - 150, 2600, 300, 125, GetColor(0x9370DBFF), "SCAN", font)) {
+                    screenWhite = SCREEN_WHITE_FRAMES;
+                    for (int k = 0; k < 9; k++) faces[scanFace][k] = scanned[k];
+                    scanFace = (scanFace + 1) % 6;
+                    if (scanFace == 0) cameraClose();  // all 6 faces scanned
+                }
+            }
+
+            if (drawButton(GetScreenWidth() / 2 - 150, 2800, 300, 125, GetColor(0x666666FF), "CLOSE", font))
+                cameraClose();
+            EndDrawing();
+            continue;
+        }
+
+        if (drawButton(1150, 2500, 200, 100, GetColor(0x666666FF), "CAMERA", font)) {
+            scanFace = 0;
+            cameraOpen();
+        }
+
         int x = GetScreenWidth() / 2. - squareSize * 3 - faceMargin * 2.5;
         for (int i = 0; i < 6; i++) {
             if (drawButton(x, 2800, squareSize, squareSize, colors[i], "", font))
@@ -208,12 +286,8 @@ int main (void)
             } else
                 selectedFacelet = (GridCoord){ -1, -1 };
             if (debug) {
-                DrawTextEx(font, TextFormat("DOWN %d", selectedFace), (Vector2){ 100, 100 }, 50, 5, BLACK);
-                DrawText(TextFormat("DOWN %d", selectedFace), 100, 100, 50, BLACK);
-                DrawTextEx(font, TextFormat("DOWN %d %d", selectedFacelet.x, selectedFacelet.y), (Vector2){ 100, 150 },
-                           50, 5, BLACK);
                 DrawTextEx(font, TextFormat("DOWN %d %d", GetMouseX(), GetMouseY()), (Vector2){ 100, 200 }, 50, 5,
-                           BLACK);
+                           RAYWHITE);
             }
         }
 

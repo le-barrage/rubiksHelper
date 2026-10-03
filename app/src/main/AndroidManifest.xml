@@ -18,6 +18,9 @@
     <uses-feature android:name="android.hardware.sensor.accelerometer"
         android:required="${REQUIRE_ACCELEROMETER}" />
 
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+
     <!-- Application config -->
 
     <application

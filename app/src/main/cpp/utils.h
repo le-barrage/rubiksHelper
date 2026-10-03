@@ -12,4 +12,6 @@ char getOrientationChar (face_t orientation);
 
 char getDirectionChar (Direction direction);
 
+Color classifyColor (Color c);
+
 #endif  // !UTILS_H
