@@ -3,11 +3,13 @@
 #include "kociemba/coordCube.h"
 #include "kociemba/enums.h"
 #include "kociemba/twoPhase.h"
+#include "raymob.h"
 #include "ui.h"
 #include "utils.h"
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define START_X GetScreenWidth() / 2. - squareSize * 1.5
 #define START_Y 250
@@ -90,8 +92,9 @@ static void toStr (char *out)
     }
 }
 
-static void printMoves ()
+static void printMoves (int y)
 {
+    if (depth == 0) return;
     char str[depth * 3];
     int curr = 0;
     for (int i = 0; i < depth; i++) {
@@ -102,7 +105,7 @@ static void printMoves ()
     str[curr++] = '\0';
 
     Vector2 textSize = MeasureTextEx(font, str, 50, 4);
-    DrawTextEx(font, str, (Vector2){ (GetScreenWidth() - textSize.x) / 2, 2500 }, 50, 4, RAYWHITE);
+    DrawTextEx(font, str, (Vector2){ (GetScreenWidth() - textSize.x) / 2, y }, 50, 4, RAYWHITE);
 }
 
 static void draw3x3 (int x, int y, int index)
@@ -186,21 +189,24 @@ int main (void)
     resetColors();
     initFacePos();
 
+    int W = GetScreenWidth(), H = GetScreenHeight();
+    int margin   = 50;
+    int barH     = 150;
+    int barY     = H - barH - 2 * margin;
+    int paletteY = barY - squareSize - margin;
+    int textY    = paletteY - 120;
+
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
 
-        if (drawButton(GetScreenWidth() - 200, 50, 150, 100, GetColor(0x666666FF), "DEBUG", font)) debug = !debug;
-
-        if (drawButton(100, 50, 150, 100, GetColor(0x666666FF), "RESET", font)) {
-            resetColors();
-            depth = 0;
-        }
+        if (drawButton(W - 200, 50, 150, 100, GetColor(0x666666FF), "DEBUG", font)) debug = !debug;
 
         if (cameraIsActive()) {
+            if (drawButton(margin, 50, 150, 100, GetColor(0x666666FF), "BACK", font)) cameraClose();
             if (cameraUpdate()) {
                 Texture2D tex = cameraGetTexture();
-                float scale   = (float)GetScreenWidth() / tex.width;
+                float scale   = (float)W / tex.width;
                 DrawTextureEx(tex, (Vector2){ 0, START_Y }, 0, scale, WHITE);
                 float w     = tex.width * scale - 400;
                 float cell  = w / 3;
@@ -218,10 +224,15 @@ int main (void)
 
                 if (screenWhite) {
                     screenWhite--;
-                    DrawRectangle(
-                        0, START_Y, tex.width * scale, tex.height * scale,
-                        (Color){ WHITE.r, WHITE.g, WHITE.b, (255 / SCREEN_WHITE_FRAMES) * screenWhite });
+                    DrawRectangle(0, START_Y, tex.width * scale, tex.height * scale,
+                                  (Color){ WHITE.r, WHITE.g, WHITE.b, (255 / SCREEN_WHITE_FRAMES) * screenWhite });
                 }
+
+                char *names      = "ULFRDB";
+                const char *text = TextFormat("Show face %c", names[scanFace]);
+                int text_x       = (W - MeasureTextEx(font, text, 75, 4).x) / 2;
+                DrawTextEx(font, TextFormat("Show face %c", names[scanFace]), (Vector2){ text_x, START_Y - 75 }, 75, 4,
+                           RAYWHITE);
 
                 Color scanned[9];
                 for (int col = 0; col < 3; col++) {
@@ -246,11 +257,8 @@ int main (void)
                     }
                 }
 
-                const char *names = "ULFRDB";
-                DrawTextEx(font, TextFormat("Show face %c", names[scanFace]), (Vector2){ start_x, start_y + w + 40 },
-                           75, 4, RAYWHITE);
-
-                if (drawButton(GetScreenWidth() / 2 - 150, 2600, 300, 125, GetColor(0x9370DBFF), "SCAN", font)) {
+                if (drawButton(W / 2 - 150, 2600, 300, 125, GetColor(0x9370DBFF), "SCAN", font)) {
+                    VibrateMS(75);
                     screenWhite = SCREEN_WHITE_FRAMES;
                     for (int k = 0; k < 9; k++) faces[scanFace][k] = scanned[k];
                     scanFace = (scanFace + 1) % 6;
@@ -258,29 +266,31 @@ int main (void)
                 }
             }
 
-            if (drawButton(GetScreenWidth() / 2 - 150, 2800, 300, 125, GetColor(0x666666FF), "CLOSE", font))
-                cameraClose();
             EndDrawing();
             continue;
         }
 
-        if (drawButton(1150, 2500, 200, 100, GetColor(0x666666FF), "CAMERA", font)) {
-            scanFace = 0;
-            cameraOpen();
+        if (drawButton(100, 50, 150, 100, GetColor(0x666666FF), "RESET", font)) {
+            resetColors();
+            depth        = 0;
+            good         = false;
+            selectedFace = -1;
         }
 
-        int x = GetScreenWidth() / 2. - squareSize * 3 - faceMargin * 2.5;
-        for (int i = 0; i < 6; i++) {
-            if (drawButton(x, 2800, squareSize, squareSize, colors[i], "", font))
-                faces[selectedFace][selectedFacelet.x * 3 + selectedFacelet.y] = colors[i];
-            x += squareSize + faceMargin;
+        if (selectedFace != -1) {
+            int x = W / 2. - squareSize * 3 - faceMargin * 2.5;
+            for (int i = 0; i < 6; i++) {
+                if (drawButton(x, paletteY, squareSize, squareSize, colors[i], "", font))
+                    faces[selectedFace][selectedFacelet.x * 3 + selectedFacelet.y] = colors[i];
+                x += squareSize + faceMargin;
+            }
         }
 
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {}
-        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
             int mouse_x = GetMouseX(), mouse_y = GetMouseY();
-            selectedFace = getFaceTouched(mouse_x, mouse_y);
-            if (selectedFace != -1) {
+            int face = getFaceTouched(mouse_x, mouse_y);
+            if (face != -1) {
+                selectedFace      = face;
                 selectedFacelet.x = (mouse_x - facesPos[selectedFace].x) / squareSize;
                 selectedFacelet.y = (mouse_y - facesPos[selectedFace].y) / squareSize;
             } else
@@ -303,7 +313,13 @@ int main (void)
             }
         }
 
-        if (drawButton(GetScreenWidth() / 2 - 150, 2200, 300, 125, GetColor(0x9370DBFF), "SOLVE", font)) {
+        int half = (W - 3 * margin) / 2;
+
+        if (drawButton(margin, barY, half, barH, GetColor(0x666666FF), "CAMERA", font)) {
+            scanFace = 0;
+            cameraOpen();
+        }
+        if (drawButton(2 * margin + half, barY, half, barH, GetColor(0x9370DBFF), "SOLVE", font)) {
             toStr(str);
             err  = findSolutionBasic(str, 25, 5000, moves, &depth);
             good = true;
@@ -311,11 +327,11 @@ int main (void)
         if (err) {
             char *errMsg      = printErrorMessage(err);
             Vector2 textWidth = MeasureTextEx(font, errMsg, 50, 4);
-            DrawTextEx(font, errMsg, (Vector2){ (GetScreenWidth() - textWidth.x) / 2, 2600 }, 50, 4, RED);
+            DrawTextEx(font, errMsg, (Vector2){ (W - textWidth.x) / 2, textY }, 50, 4, RED);
         } else if (!err && good)
-            printMoves();
+            printMoves(textY);
 
-        if (debug) DrawLine(GetScreenWidth() / 2, 0, GetScreenWidth() / 2, GetScreenHeight(), BLACK);
+        if (debug) DrawLine(W / 2, 0, W / 2, GetScreenHeight(), BLACK);
 
         EndDrawing();
     }
