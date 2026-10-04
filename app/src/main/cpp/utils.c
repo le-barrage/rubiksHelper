@@ -68,7 +68,7 @@ Color classifyColor (Color c)
     if (hsv.y < 0.25f && hsv.z > 0.5f) return WHITE;
 
     float h = hsv.x;
-    if (h < 10 || h >= 330) return RED;
+    if (h < 8 || h >= 330) return RED;
 
     if (h < 40) return ORANGE;
     if (h < 75) return YELLOW;
