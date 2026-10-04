@@ -1,7 +1,7 @@
 #include "camera.h"
 #include "deps/raylib/src/raylib.h"
+#include "font.h"
 #include "kociemba/coordCube.h"
-#include "kociemba/enums.h"
 #include "kociemba/twoPhase.h"
 #include "raymob.h"
 #include "ui.h"
@@ -9,7 +9,6 @@
 
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #define START_X GetScreenWidth() / 2. - squareSize * 1.5
 #define START_Y 250
@@ -19,6 +18,7 @@ typedef struct {
     int y;
 } GridCoord;
 
+Font fontBold;
 Font font;
 
 Color faces[6][9]     = { 0 };
@@ -104,8 +104,7 @@ static void printMoves (int y)
     }
     str[curr++] = '\0';
 
-    Vector2 textSize = MeasureTextEx(font, str, 50, 4);
-    DrawTextEx(font, str, (Vector2){ (GetScreenWidth() - textSize.x) / 2, y }, 50, 4, RAYWHITE);
+    drawTextBoxed(str, FONT_SEMIBOLD, 80, y);
 }
 
 static void draw3x3 (int x, int y, int index)
@@ -122,10 +121,10 @@ static void draw3x3 (int x, int y, int index)
             if (debug) {
                 char num[2];
                 sprintf(num, "%d", j * 3 + i);
-                Vector2 textWidth = MeasureTextEx(font, num, 30, 3);
+                Vector2 textWidth = MeasureTextEx(fontBold, num, 30, 3);
                 int textX         = squareX + (squareSize - textWidth.x) / 2;
                 int textY         = squareY + (squareSize - 20) / 2;
-                DrawTextEx(font, num, (Vector2){ textX, textY }, 30, 3, BLACK);
+                DrawTextEx(fontBold, num, (Vector2){ textX, textY }, 30, 3, BLACK);
             }
         }
     }
@@ -184,26 +183,33 @@ int main (void)
     InitWindow(GetScreenWidth(), GetScreenHeight(), "rubiksHelper");
     SetTargetFPS(60);
 
-    font = LoadFont("SpaceGrotesk/SpaceGrotesk-SemiBold.ttf");
+    int codepointCount;
+    int *codepoints = LoadCodepoints(
+        " !\"#$%&'()*+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+        &codepointCount);
+
+    fontBold = fontGet(FONT_BOLD, 50);
+    font     = fontGet(FONT_REGULAR, 100);
 
     resetColors();
     initFacePos();
 
     int W = GetScreenWidth(), H = GetScreenHeight();
-    int margin   = 50;
-    int barH     = 150;
-    int barY     = H - barH - 2 * margin;
-    int paletteY = barY - squareSize - margin;
-    int textY    = paletteY - 120;
+    int margin    = 50;
+    int barH      = 150;
+    int barY      = H - barH - 2 * margin;
+    int paletteY  = barY - squareSize - margin;
+    int schemaEnd = facesPos[5].y + squareSize * 3;
+    int textY     = schemaEnd + (paletteY - schemaEnd) / 2;  // paletteY - 120;
 
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(GetColor(0x181818FF));
 
-        if (drawButton(W - 200, 50, 150, 100, GetColor(0x666666FF), "DEBUG", font)) debug = !debug;
+        if (drawButton(W - 200, 50, 150, 100, GetColor(0x666666FF), "DEBUG", fontBold)) debug = !debug;
 
         if (cameraIsActive()) {
-            if (drawButton(margin, 50, 150, 100, GetColor(0x666666FF), "BACK", font)) cameraClose();
+            if (drawButton(margin, margin, 150, 100, GetColor(0x666666FF), "BACK", fontBold)) cameraClose();
             if (cameraUpdate()) {
                 Texture2D tex = cameraGetTexture();
                 float scale   = (float)W / tex.width;
@@ -230,9 +236,8 @@ int main (void)
 
                 char *names      = "ULFRDB";
                 const char *text = TextFormat("Show face %c", names[scanFace]);
-                int text_x       = (W - MeasureTextEx(font, text, 75, 4).x) / 2;
-                DrawTextEx(font, TextFormat("Show face %c", names[scanFace]), (Vector2){ text_x, START_Y - 75 }, 75, 4,
-                           RAYWHITE);
+                int text_x       = (W - MeasureTextEx(fontBold, text, 75, 4).x) / 2;
+                fontDraw(text, text_x, START_Y - 80, FONT_REGULAR, 80, RAYWHITE);
 
                 Color scanned[9];
                 for (int col = 0; col < 3; col++) {
@@ -250,14 +255,16 @@ int main (void)
                         DrawRectangleLines(cx - 25, cy - 25, 50, 50, BLACK);
 
                         if (debug) {
-                            Vector3 hsv = ColorToHSV(raw);
-                            DrawTextEx(font, TextFormat("H %.0f  S %.2f  V %.2f", hsv.x, hsv.y, hsv.z),
-                                       (Vector2){ start_x + 260, start_y + w + (col * 3 + row) * 70 }, 50, 3, RAYWHITE);
+                            Vector3 hsv   = ColorToHSV(raw);
+                            const char *t = TextFormat("H %.0f  S %.2f  V %.2f", hsv.x, hsv.y, hsv.z);
+                            int text_y    = (W - fontMeasure(t, FONT_REGULAR, 50)) / 2;
+                            fontDraw(t, text_y, start_y + w + (col * 3 + row) * 70, FONT_REGULAR, 50, RAYWHITE);
                         }
                     }
                 }
 
-                if (drawButton(W / 2 - 150, 2600, 300, 125, GetColor(0x9370DBFF), "SCAN", font)) {
+                if (drawButtonPro(W / 2 - 150, 2600, 300, 125, GetColor(0x9370DBFF), "SCAN", font, 100, BLACK, 0.55,
+                                  1.f)) {
                     VibrateMS(75);
                     screenWhite = SCREEN_WHITE_FRAMES;
                     for (int k = 0; k < 9; k++) faces[scanFace][k] = scanned[k];
@@ -270,7 +277,7 @@ int main (void)
             continue;
         }
 
-        if (drawButton(100, 50, 150, 100, GetColor(0x666666FF), "RESET", font)) {
+        if (drawButton(margin, margin, 150, 100, GetColor(0x666666FF), "RESET", fontBold)) {
             resetColors();
             depth        = 0;
             good         = false;
@@ -280,7 +287,7 @@ int main (void)
         if (selectedFace != -1) {
             int x = W / 2. - squareSize * 3 - faceMargin * 2.5;
             for (int i = 0; i < 6; i++) {
-                if (drawButton(x, paletteY, squareSize, squareSize, colors[i], "", font))
+                if (drawButton(x, paletteY, squareSize, squareSize, colors[i], "", fontBold))
                     faces[selectedFace][selectedFacelet.x * 3 + selectedFacelet.y] = colors[i];
                 x += squareSize + faceMargin;
             }
@@ -293,11 +300,9 @@ int main (void)
                 selectedFace      = face;
                 selectedFacelet.x = (mouse_x - facesPos[selectedFace].x) / squareSize;
                 selectedFacelet.y = (mouse_y - facesPos[selectedFace].y) / squareSize;
-            } else
+            } else {
+                selectedFace    = -1;
                 selectedFacelet = (GridCoord){ -1, -1 };
-            if (debug) {
-                DrawTextEx(font, TextFormat("DOWN %d %d", GetMouseX(), GetMouseY()), (Vector2){ 100, 200 }, 50, 5,
-                           RAYWHITE);
             }
         }
 
@@ -315,28 +320,40 @@ int main (void)
 
         int half = (W - 3 * margin) / 2;
 
-        if (drawButton(margin, barY, half, barH, GetColor(0x666666FF), "CAMERA", font)) {
+        if (drawButtonPro(margin, barY, half, barH, GetColor(0x666666FF), "CAMERA", font, 100, BLACK, 0.55, 1.f)) {
             scanFace = 0;
             cameraOpen();
         }
-        if (drawButton(2 * margin + half, barY, half, barH, GetColor(0x9370DBFF), "SOLVE", font)) {
+        if (drawButtonPro(2 * margin + half, barY, half, barH, GetColor(0x9370DBFF), "SOLVE", font, 100, BLACK, 0.55,
+                          1.f)) {
             toStr(str);
             err  = findSolutionBasic(str, 25, 5000, moves, &depth);
             good = true;
         }
         if (err) {
             char *errMsg      = printErrorMessage(err);
-            Vector2 textWidth = MeasureTextEx(font, errMsg, 50, 4);
-            DrawTextEx(font, errMsg, (Vector2){ (W - textWidth.x) / 2, textY }, 50, 4, RED);
+            Vector2 textWidth = MeasureTextEx(fontBold, errMsg, 50, 4);
+            DrawTextEx(fontBold, errMsg, (Vector2){ (W - textWidth.x) / 2, textY }, 50, 4, RED);
         } else if (!err && good)
             printMoves(textY);
 
-        if (debug) DrawLine(W / 2, 0, W / 2, GetScreenHeight(), BLACK);
+        if (debug) {
+            DrawLine(W / 2, 0, W / 2, GetScreenHeight(), BLACK);
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+                DrawTextEx(fontBold, TextFormat("DOWN %d %d", GetMouseX(), GetMouseY()), (Vector2){ 100, 200 }, 50, 5,
+                           RAYWHITE);
+                DrawTextEx(fontBold, TextFormat("Selected face %d", selectedFace), (Vector2){ 100, 250 }, 50, 5,
+                           RAYWHITE);
+            }
+        }
 
         EndDrawing();
     }
     cameraClose();
+    UnloadFont(fontBold);
     UnloadFont(font);
+    UnloadCodepoints(codepoints);
+    fontShutdown();
 
     CloseWindow();
 
