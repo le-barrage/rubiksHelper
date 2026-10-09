@@ -32,6 +32,51 @@ bool drawButton (int x, int y, int width, int height, Color color, char *text, F
     return drawButtonPro(x, y, width, height, color, text, font, 50, BLACK, 0.2, 1.f);
 }
 
+Texture2D loadIcon (const char *path, bool invert)
+{
+    Image image = LoadImage(path);
+    ImageColorInvert(&image);
+    Texture2D icon = LoadTextureFromImage(image);
+    UnloadImage(image);
+    GenTextureMipmaps(&icon);
+    SetTextureFilter(icon, TEXTURE_FILTER_TRILINEAR);
+    return icon;
+}
+
+bool drawIconButton (int x, int y, int size, Texture2D icon, Color iconColor)
+{
+    int padding   = size / 6;
+    Rectangle src = { 0, 0, icon.width, icon.height };
+    Rectangle dst = { x + padding, y + padding, size - 2 * padding, size - 2 * padding };
+    DrawTexturePro(icon, src, dst, (Vector2){ 0, 0 }, 0, iconColor);
+
+    int mouse_x = GetMouseX(), mouse_y = GetMouseY();
+    return IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && x <= mouse_x && mouse_x <= x + size && y <= mouse_y
+           && mouse_y <= y + size;
+}
+
+bool drawIconTextButton (int x, int y, int width, int height, Color color, char *text, Font font, int fontSize,
+                         Color textColor, Texture2D icon, float roundness)
+{
+    DrawRectangleRoundedLinesEx((Rectangle){ x, y, width, height }, roundness, 1, 3, color);
+    int spacing      = min(fontSize / 10, 4);
+    Vector2 textSize = MeasureTextEx(font, text, fontSize, spacing);
+    int iconSize     = textSize.y * 0.8f;
+    int gap          = fontSize / 4;
+    int groupX       = x + (width - (iconSize + gap + textSize.x)) / 2.f;
+
+    Rectangle src = { 0, 0, icon.width, icon.height };
+    Rectangle dst = { groupX, y + (height - iconSize) / 2.f, iconSize, iconSize };
+    DrawTexturePro(icon, src, dst, (Vector2){ 0, 0 }, 0, textColor);
+
+    Vector2 textPos = { groupX + iconSize + gap, y + (height - textSize.y) / 2.f };
+    DrawTextEx(font, text, textPos, fontSize, spacing, textColor);
+
+    int mouse_x = GetMouseX(), mouse_y = GetMouseY();
+    return IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && x <= mouse_x && mouse_x <= x + width && y <= mouse_y
+           && mouse_y <= y + height;
+}
+
 void drawTextBoxed (const char *text, FontStyle style, float font_size, int y)
 {
     if (strlen(text) == 0) return;

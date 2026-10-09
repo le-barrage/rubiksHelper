@@ -24,6 +24,26 @@ char getNotationFromColor (Color c)
     return '?';
 }
 
+char getNotationFromIndex (int index)
+{
+    switch (index) {
+        case 0:
+            return 'U';
+        case 1:
+            return 'L';
+        case 2:
+            return 'F';
+        case 3:
+            return 'R';
+        case 4:
+            return 'D';
+        case 5:
+            return 'B';
+        default:
+            return '?';
+    }
+}
+
 char getOrientationChar (face_t orientation)
 {
     switch (orientation) {

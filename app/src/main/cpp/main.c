@@ -10,7 +10,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define START_X GetScreenWidth() / 2. - squareSize * 1.5
+#define FACE_SIZE (3 * squareSize + 2 * squareMargin)
+
+#define START_X (GetScreenWidth() / 2. - FACE_SIZE / 2.)
 #define START_Y 250
 
 typedef struct {
@@ -28,8 +30,9 @@ Color colors[6]       = { WHITE, ORANGE, GREEN, RED, YELLOW, BLUE };
 int selectedFace          = -1;
 GridCoord selectedFacelet = { -1, -1 };
 
-int squareSize = 135;
-int faceMargin = 20;
+int squareSize   = 135;
+int squareMargin = 10;
+int faceMargin   = 35;
 
 char str[54]   = { 0 };
 Move moves[30] = { 0 };
@@ -109,14 +112,29 @@ static void printMoves (int y)
 
 static void draw3x3 (int x, int y, int index)
 {
-    DrawRectangle(x - 5, y - 5, squareSize * 3 + 10, squareSize * 3 + 10, GRAY);
-    for (int j = 0; j < 3; j++) {
-        int squareY = y + j * squareSize;
-        for (int i = 0; i < 3; i++) {
-            int squareX = x + i * squareSize;
+    float squareRoundness = 0.3f;
+    const int pad         = 8;
 
-            DrawRectangle(squareX, squareY, squareSize, squareSize, faces[index][i * 3 + j]);
-            DrawRectangleLines(squareX, squareY, squareSize, squareSize, BLACK);
+    float innerRadius = squareRoundness * squareSize / 2.f;
+    float bgSize      = FACE_SIZE + 2 * pad;
+    float bgRoundness = 2.f * (innerRadius + pad) / bgSize;
+
+    DrawRectangleRounded((Rectangle){ x - pad, y - pad, bgSize, bgSize }, bgRoundness, 0, GRAY);
+
+    for (int j = 0; j < 3; j++) {
+        int squareY = y + j * (squareSize + squareMargin);
+        for (int i = 0; i < 3; i++) {
+            int squareX = x + i * (squareSize + squareMargin);
+            Rectangle r = { squareX, squareY, squareSize, squareSize };
+            DrawRectangleRounded(r, squareRoundness, 1, faces[index][i * 3 + j]);
+            DrawRectangleRoundedLines(r, squareRoundness, 1, BLACK);
+
+            if (i == 1 && j == 1) {
+                const char *t = TextFormat("%c", getNotationFromIndex(index));
+                int tw        = fontMeasure(t, FONT_SEMIBOLD, 50);
+                int ty        = fontMeasureY(FONT_SEMIBOLD, 50);
+                fontDraw(t, squareX + (squareSize - tw) / 2, squareY + (squareSize - ty) / 2, FONT_SEMIBOLD, 50, BLACK);
+            }
 
             if (debug) {
                 char num[2];
@@ -132,8 +150,8 @@ static void draw3x3 (int x, int y, int index)
 
 int getFaceTouched (int px, int py)
 {
-    int gridStartX = GetScreenWidth() / 2. - (squareSize * 4.5 + faceMargin);
-    int spacing    = squareSize * 3 + faceMargin;
+    int gridStartX = GetScreenWidth() / 2. - (FACE_SIZE * 1.5 + faceMargin);
+    int spacing    = FACE_SIZE + faceMargin;
 
     int offsetX = px - gridStartX;
     int offsetY = py - START_Y;
@@ -144,7 +162,7 @@ int getFaceTouched (int px, int py)
     int marginX = offsetX % spacing;
     int marginY = offsetY % spacing;
 
-    if (marginX >= squareSize * 3 || marginY >= squareSize * 3) return -1;
+    if (marginX >= FACE_SIZE || marginY >= FACE_SIZE) return -1;
 
     GridCoord coord = { .x = offsetX / spacing, .y = offsetY / spacing };
 
@@ -170,11 +188,11 @@ static void resetColors ()
 static void initFacePos ()
 {
     facesPos[0] = (GridCoord){ START_X, START_Y };
-    facesPos[1] = (GridCoord){ START_X - 3 * squareSize - faceMargin, START_Y + 3 * squareSize + faceMargin };
-    facesPos[2] = (GridCoord){ START_X, START_Y + 3 * squareSize + faceMargin };
-    facesPos[3] = (GridCoord){ START_X + 3 * squareSize + faceMargin, START_Y + 3 * squareSize + faceMargin };
-    facesPos[4] = (GridCoord){ START_X, START_Y + 2 * (3 * squareSize + faceMargin) };
-    facesPos[5] = (GridCoord){ START_X, START_Y + 3 * (3 * squareSize + faceMargin) };
+    facesPos[1] = (GridCoord){ START_X - FACE_SIZE - faceMargin, START_Y + FACE_SIZE + faceMargin };
+    facesPos[2] = (GridCoord){ START_X, START_Y + FACE_SIZE + faceMargin };
+    facesPos[3] = (GridCoord){ START_X + FACE_SIZE + faceMargin, START_Y + FACE_SIZE + faceMargin };
+    facesPos[4] = (GridCoord){ START_X, START_Y + 2 * (FACE_SIZE + faceMargin) };
+    facesPos[5] = (GridCoord){ START_X, START_Y + 3 * (FACE_SIZE + faceMargin) };
 }
 
 int main (void)
@@ -191,6 +209,11 @@ int main (void)
     fontBold = fontGet(FONT_BOLD, 50);
     font     = fontGet(FONT_REGULAR, 100);
 
+    Texture2D bugIcon    = loadIcon("bug.png", true);
+    Texture2D undoIcon   = loadIcon("undo.png", true);
+    Texture2D cameraIcon = loadIcon("camera.png", true);
+    Texture2D backIcon   = loadIcon("back.png", true);
+
     resetColors();
     initFacePos();
 
@@ -199,17 +222,20 @@ int main (void)
     int barH      = 150;
     int barY      = H - barH - 2 * margin;
     int paletteY  = barY - squareSize - margin;
-    int schemaEnd = facesPos[5].y + squareSize * 3;
-    int textY     = schemaEnd + (paletteY - schemaEnd) / 2;  // paletteY - 120;
+    int schemaEnd = facesPos[5].y + FACE_SIZE;
+    int textY     = schemaEnd + (paletteY - schemaEnd) / 2;
 
     while (!WindowShouldClose()) {
         BeginDrawing();
-        ClearBackground(GetColor(0x181818FF));
+        ClearBackground(GetColor(0x1a1a1aFF));
 
-        if (drawButton(W - 200, 50, 150, 100, GetColor(0x666666FF), "DEBUG", fontBold)) debug = !debug;
+        // Light gray when off, purple when debug is on
+        Color debugColor = debug ? GetColor(0x9370DBFF) : GetColor(0xCCCCCCFF);
+        int debugSize    = 125;
+        if (drawIconButton(W - debugSize - margin, margin, debugSize, bugIcon, debugColor)) debug = !debug;
 
         if (cameraIsActive()) {
-            if (drawButton(margin, margin, 150, 100, GetColor(0x666666FF), "BACK", fontBold)) cameraClose();
+            if (drawIconButton(margin, margin, 150, backIcon, debugColor)) cameraClose();
             if (cameraUpdate()) {
                 Texture2D tex = cameraGetTexture();
                 float scale   = (float)W / tex.width;
@@ -218,15 +244,16 @@ int main (void)
                 float cell  = w / 3;
                 int start_x = 200, start_y = START_Y + 200;
                 int line_width = 8;
-                DrawRectangleLinesEx((Rectangle){ 200, START_Y + 200, w, w }, line_width, BLACK);
-                DrawLineEx((Vector2){ start_x, start_y + w / 3 }, (Vector2){ start_x + w, start_y + w / 3 }, line_width,
-                           BLACK);
-                DrawLineEx((Vector2){ start_x, start_y + 2 * w / 3 }, (Vector2){ start_x + w, start_y + 2 * w / 3 },
-                           line_width, BLACK);
-                DrawLineEx((Vector2){ start_x + w / 3, start_y }, (Vector2){ start_x + w / 3, start_y + w }, line_width,
-                           BLACK);
-                DrawLineEx((Vector2){ start_x + 2 * w / 3, start_y }, (Vector2){ start_x + 2 * w / 3, start_y + w },
-                           line_width, BLACK);
+                int gap        = 20;
+                float round    = 0.3f;
+
+                for (int col = 0; col < 3; col++) {
+                    for (int row = 0; row < 3; row++) {
+                        Rectangle r = { start_x + col * cell + gap / 2.f, start_y + row * cell + gap / 2.f, cell - gap,
+                                        cell - gap };
+                        DrawRectangleRoundedLinesEx(r, round, 0, line_width, BLACK);
+                    }
+                }
 
                 if (screenWhite) {
                     screenWhite--;
@@ -251,8 +278,9 @@ int main (void)
                         Color raw              = cameraSampleColor(tx, ty, (cell / scale) / 6);
                         scanned[col * 3 + row] = classifyColor(raw);
 
-                        DrawRectangle(cx - 25, cy - 25, 50, 50, scanned[col * 3 + row]);
-                        DrawRectangleLines(cx - 25, cy - 25, 50, 50, BLACK);
+                        Rectangle swatch = { cx - 25, cy - 25, 50, 50 };
+                        DrawRectangleRounded(swatch, round, 0, scanned[col * 3 + row]);
+                        DrawRectangleRoundedLinesEx(swatch, round, 0, 3, BLACK);
 
                         if (debug) {
                             Vector3 hsv   = ColorToHSV(raw);
@@ -263,8 +291,8 @@ int main (void)
                     }
                 }
 
-                if (drawButtonPro(W / 2 - 150, 2600, 300, 125, GetColor(0x9370DBFF), "SCAN", font, 100, BLACK, 0.55,
-                                  1.f)) {
+                if (drawIconTextButton(W / 2 - W / 6, 2600, W / 3, 125, GetColor(0x00E0C7FF), "SCAN", font, 100,
+                                       GetColor(0x00E0C7FF), cameraIcon, 0.55)) {
                     VibrateMS(75);
                     screenWhite = SCREEN_WHITE_FRAMES;
                     for (int k = 0; k < 9; k++) faces[scanFace][k] = scanned[k];
@@ -277,7 +305,7 @@ int main (void)
             continue;
         }
 
-        if (drawButton(margin, margin, 150, 100, GetColor(0x666666FF), "RESET", fontBold)) {
+        if (drawIconButton(margin, margin, debugSize, undoIcon, debugColor)) {
             resetColors();
             depth        = 0;
             good         = false;
@@ -298,8 +326,10 @@ int main (void)
             int face = getFaceTouched(mouse_x, mouse_y);
             if (face != -1) {
                 selectedFace      = face;
-                selectedFacelet.x = (mouse_x - facesPos[selectedFace].x) / squareSize;
-                selectedFacelet.y = (mouse_y - facesPos[selectedFace].y) / squareSize;
+                int relX          = mouse_x - facesPos[selectedFace].x;
+                int relY          = mouse_y - facesPos[selectedFace].y;
+                selectedFacelet.x = relX / (squareSize + squareMargin);
+                selectedFacelet.y = relY / (squareSize + squareMargin);
             } else {
                 selectedFace    = -1;
                 selectedFacelet = (GridCoord){ -1, -1 };
@@ -310,21 +340,20 @@ int main (void)
             int x = facesPos[i].x, y = facesPos[i].y;
             draw3x3(x, y, i);
             if (selectedFace == i) {
-                DrawRectangleLinesEx((Rectangle){ x, y, squareSize * 3, squareSize * 3 }, 5, BLACK);
-                DrawRectangleLinesEx((Rectangle){ selectedFacelet.x * squareSize + facesPos[i].x,
-                                                  selectedFacelet.y * squareSize + facesPos[i].y, squareSize,
-                                                  squareSize },
-                                     3, BLACK);
+                int hx = facesPos[i].x + selectedFacelet.x * (squareSize + squareMargin);
+                int hy = facesPos[i].y + selectedFacelet.y * (squareSize + squareMargin);
+                DrawRectangleRoundedLinesEx((Rectangle){ hx, hy, squareSize, squareSize }, 0.3, 1, 3, BLACK);
             }
         }
 
         int half = (W - 3 * margin) / 2;
 
-        if (drawButtonPro(margin, barY, half, barH, GetColor(0x666666FF), "CAMERA", font, 100, BLACK, 0.55, 1.f)) {
+        if (drawIconTextButton(margin, barY, half, barH, GetColor(0x00E0C7FF), "Camera", font, 100,
+                               GetColor(0x00E0C7FF), cameraIcon, 0.55)) {
             scanFace = 0;
             cameraOpen();
         }
-        if (drawButtonPro(2 * margin + half, barY, half, barH, GetColor(0x9370DBFF), "SOLVE", font, 100, BLACK, 0.55,
+        if (drawButtonPro(2 * margin + half, barY, half, barH, GetColor(0x00E0C7FF), "SOLVE", font, 100, BLACK, 0.55,
                           1.f)) {
             toStr(str);
             err  = findSolutionBasic(str, 25, 5000, moves, &depth);
@@ -350,6 +379,10 @@ int main (void)
         EndDrawing();
     }
     cameraClose();
+    UnloadTexture(bugIcon);
+    UnloadTexture(undoIcon);
+    UnloadTexture(cameraIcon);
+    UnloadTexture(backIcon);
     UnloadFont(fontBold);
     UnloadFont(font);
     UnloadCodepoints(codepoints);

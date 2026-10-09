@@ -8,6 +8,8 @@ bool colorEquals (Color c1, Color c2);
 
 char getNotationFromColor (Color c);
 
+char getNotationFromIndex (int index);
+
 char getOrientationChar (face_t orientation);
 
 char getDirectionChar (Direction direction);
