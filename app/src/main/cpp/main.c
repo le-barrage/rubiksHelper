@@ -13,7 +13,7 @@
 #define FACE_SIZE (3 * squareSize + 2 * squareMargin)
 
 #define START_X (GetScreenWidth() / 2. - FACE_SIZE / 2.)
-#define START_Y 250
+#define START_Y 275
 
 typedef struct {
     int x;
@@ -102,12 +102,13 @@ static void printMoves (int y)
     int curr = 0;
     for (int i = 0; i < depth; i++) {
         str[curr++] = getOrientationChar(moves[i].orientation);
-        str[curr++] = getDirectionChar(moves[i].direction);
+        char dir    = getDirectionChar(moves[i].direction);
+        if (dir != '.') str[curr++] = dir;
         str[curr++] = ' ';
     }
-    str[curr++] = '\0';
+    str[curr] = '\0';
 
-    drawTextBoxed(str, FONT_SEMIBOLD, 80, y);
+    drawTextBoxed(str, FONT_SEMIBOLD, 80, y, false);
 }
 
 static void draw3x3 (int x, int y, int index)
@@ -119,7 +120,7 @@ static void draw3x3 (int x, int y, int index)
     float bgSize      = FACE_SIZE + 2 * pad;
     float bgRoundness = 2.f * (innerRadius + pad) / bgSize;
 
-    DrawRectangleRounded((Rectangle){ x - pad, y - pad, bgSize, bgSize }, bgRoundness, 0, GRAY);
+    DrawRectangleRounded((Rectangle){ x - pad, y - pad, bgSize, bgSize }, bgRoundness, 0, GetColor(0x141516));
 
     for (int j = 0; j < 3; j++) {
         int squareY = y + j * (squareSize + squareMargin);
@@ -127,7 +128,7 @@ static void draw3x3 (int x, int y, int index)
             int squareX = x + i * (squareSize + squareMargin);
             Rectangle r = { squareX, squareY, squareSize, squareSize };
             DrawRectangleRounded(r, squareRoundness, 1, faces[index][i * 3 + j]);
-            DrawRectangleRoundedLines(r, squareRoundness, 1, BLACK);
+            // DrawRectangleRoundedLinesEx(r, squareRoundness, 1, 2, BLACK);
 
             if (i == 1 && j == 1) {
                 const char *t = TextFormat("%c", getNotationFromIndex(index));
@@ -206,7 +207,7 @@ int main (void)
         " !\"#$%&'()*+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
         &codepointCount);
 
-    fontBold = fontGet(FONT_BOLD, 50);
+    fontBold = fontGet(FONT_SEMIBOLD, 50);
     font     = fontGet(FONT_REGULAR, 100);
 
     Texture2D bugIcon    = loadIcon("bug.png", true);
@@ -234,23 +235,47 @@ int main (void)
         int debugSize    = 125;
         if (drawIconButton(W - debugSize - margin, margin, debugSize, bugIcon, debugColor)) debug = !debug;
 
+        if (backPressed()) {
+            if (cameraIsActive())
+                cameraClose();
+            else if (selectedFace != -1) {
+                selectedFace    = -1;
+                selectedFacelet = (GridCoord){ -1, -1 };
+            } else
+                moveAppToBackground();
+        }
+
         if (cameraIsActive()) {
             if (drawIconButton(margin, margin, 150, backIcon, debugColor)) cameraClose();
             if (cameraUpdate()) {
                 Texture2D tex = cameraGetTexture();
                 float scale   = (float)W / tex.width;
                 DrawTextureEx(tex, (Vector2){ 0, START_Y }, 0, scale, WHITE);
-                float w     = tex.width * scale - 400;
-                float cell  = w / 3;
-                int start_x = 200, start_y = START_Y + 200;
+                float w    = tex.width * scale - 400;
+                float cell = w / 3;
+
                 int line_width = 8;
                 int gap        = 20;
-                float round    = 0.3f;
+                float round    = 0.2f;
+
+                float inset    = gap / 2.f + line_width;
+                float cellSide = cell - 2 * inset;
+
+                float gridSide = 3 * cell;
+                int start_x = (W - gridSide) / 2, start_y = START_Y + 200;
+
+                int frameSide   = 3 * cell + gap;
+                Rectangle frame = { start_x - gap / 2.f, start_y - gap / 2.f, frameSide, frameSide };
+
+                float cellRadius     = round * cellSide / 2.f;
+                float frameRadius    = cellRadius + line_width + gap;
+                float frameRoundness = 2.f * frameRadius / frame.width;
+                DrawRectangleRoundedLinesEx(frame, frameRoundness, 0, line_width, UI_BLUE);
 
                 for (int col = 0; col < 3; col++) {
                     for (int row = 0; row < 3; row++) {
-                        Rectangle r = { start_x + col * cell + gap / 2.f, start_y + row * cell + gap / 2.f, cell - gap,
-                                        cell - gap };
+                        Rectangle r
+                            = { start_x + col * cell + inset, start_y + row * cell + inset, cellSide, cellSide };
                         DrawRectangleRoundedLinesEx(r, round, 0, line_width, BLACK);
                     }
                 }
@@ -263,8 +288,8 @@ int main (void)
 
                 char *names      = "ULFRDB";
                 const char *text = TextFormat("Show face %c", names[scanFace]);
-                int text_x       = (W - MeasureTextEx(fontBold, text, 75, 4).x) / 2;
-                fontDraw(text, text_x, START_Y - 80, FONT_REGULAR, 80, RAYWHITE);
+                int text_x       = (W - fontMeasure(text, FONT_REGULAR, 80)) / 2;
+                fontDraw(text, text_x, START_Y - 100, FONT_REGULAR, 80, RAYWHITE);
 
                 Color scanned[9];
                 for (int col = 0; col < 3; col++) {
@@ -278,7 +303,8 @@ int main (void)
                         Color raw              = cameraSampleColor(tx, ty, (cell / scale) / 6);
                         scanned[col * 3 + row] = classifyColor(raw);
 
-                        Rectangle swatch = { cx - 25, cy - 25, 50, 50 };
+                        int width        = 60;
+                        Rectangle swatch = { cx - width / 2.f, cy - width / 2.f, width, width };
                         DrawRectangleRounded(swatch, round, 0, scanned[col * 3 + row]);
                         DrawRectangleRoundedLinesEx(swatch, round, 0, 3, BLACK);
 
@@ -286,13 +312,19 @@ int main (void)
                             Vector3 hsv   = ColorToHSV(raw);
                             const char *t = TextFormat("H %.0f  S %.2f  V %.2f", hsv.x, hsv.y, hsv.z);
                             int text_y    = (W - fontMeasure(t, FONT_REGULAR, 50)) / 2;
-                            fontDraw(t, text_y, start_y + w + (col * 3 + row) * 70, FONT_REGULAR, 50, RAYWHITE);
+                            fontDraw(t, text_y, start_y + frameSide + (col * 3 + row) * 70, FONT_REGULAR, 50, RAYWHITE);
+                            DrawLineEx((Vector2){ W / 2.f, 0 }, (Vector2){ W / 2.f, GetScreenHeight() }, 3, BLACK);
                         }
                     }
                 }
 
-                if (drawIconTextButton(W / 2 - W / 6, 2600, W / 3, 125, GetColor(0x00E0C7FF), "SCAN", font, 100,
-                                       GetColor(0x00E0C7FF), cameraIcon, 0.55)) {
+                const char *point = TextFormat("Point the camera at the %s face, %s face on top",
+                                               getColorNameFromNotation(names[scanFace]),
+                                               getColorNameFromNotation(getTopNotationFromNotation(names[scanFace])));
+                drawTextBoxed(point, FONT_REGULAR, 80, START_Y + tex.height * scale - 50, true);
+
+                if (drawIconTextButton(W / 2 - W / 6, 2600, W / 3, 200, UI_BLUE, "Scan", fontBold, 85, UI_BLUE,
+                                       cameraIcon, 0.55)) {
                     VibrateMS(75);
                     screenWhite = SCREEN_WHITE_FRAMES;
                     for (int k = 0; k < 9; k++) faces[scanFace][k] = scanned[k];
@@ -308,6 +340,7 @@ int main (void)
         if (drawIconButton(margin, margin, debugSize, undoIcon, debugColor)) {
             resetColors();
             depth        = 0;
+            err          = 0;
             good         = false;
             selectedFace = -1;
         }
@@ -348,13 +381,11 @@ int main (void)
 
         int half = (W - 3 * margin) / 2;
 
-        if (drawIconTextButton(margin, barY, half, barH, GetColor(0x00E0C7FF), "Camera", font, 100,
-                               GetColor(0x00E0C7FF), cameraIcon, 0.55)) {
+        if (drawIconTextButton(margin, barY, half, barH, UI_BLUE, "Camera", fontBold, 85, UI_BLUE, cameraIcon, 0.55)) {
             scanFace = 0;
             cameraOpen();
         }
-        if (drawButtonPro(2 * margin + half, barY, half, barH, GetColor(0x00E0C7FF), "SOLVE", font, 100, BLACK, 0.55,
-                          1.f)) {
+        if (drawButtonPro(2 * margin + half, barY, half, barH, UI_BLUE, "Solve", fontBold, 85, BLACK, 0.55, 1.f)) {
             toStr(str);
             err  = findSolutionBasic(str, 25, 5000, moves, &depth);
             good = true;
@@ -367,7 +398,7 @@ int main (void)
             printMoves(textY);
 
         if (debug) {
-            DrawLine(W / 2, 0, W / 2, GetScreenHeight(), BLACK);
+            DrawLineEx((Vector2){ W / 2.f, 0 }, (Vector2){ W / 2.f, GetScreenHeight() }, 3, BLACK);
             if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
                 DrawTextEx(fontBold, TextFormat("DOWN %d %d", GetMouseX(), GetMouseY()), (Vector2){ 100, 200 }, 50, 5,
                            RAYWHITE);

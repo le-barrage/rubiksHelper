@@ -1,8 +1,28 @@
 #include "utils.h"
 
 #include "raylib.h"
+#include "raymob.h"
 
 #include <stdbool.h>
+
+bool backPressed (void)
+{
+    bool pressed = false;
+    for (int key = GetKeyPressed(); key != 0; key = GetKeyPressed())
+        if (key == KEY_BACK) pressed = true;
+    return pressed;
+}
+
+void moveAppToBackground (void)
+{
+    JNIEnv *env        = AttachCurrentThread();
+    jobject activity   = GetNativeLoaderInstance();
+    jclass cls         = (*env)->GetObjectClass(env, activity);
+    jmethodID moveTask = (*env)->GetMethodID(env, cls, "moveTaskToBack", "(Z)Z");
+    (*env)->CallBooleanMethod(env, activity, moveTask, JNI_TRUE);
+    (*env)->DeleteLocalRef(env, cls);
+    DetachCurrentThread();
+}
 
 bool colorEquals (Color c1, Color c2) { return c1.a == c2.a && c1.r == c2.r && c1.g == c2.g && c1.b == c2.b; }
 
@@ -40,6 +60,46 @@ char getNotationFromIndex (int index)
         case 5:
             return 'B';
         default:
+            return '?';
+    }
+}
+
+char *getColorNameFromNotation (char face)
+{
+    switch (face) {
+        case 'U':
+            return "white";
+        case 'L':
+            return "orange";
+        case 'F':
+            return "green";
+        case 'R':
+            return "red";
+        case 'D':
+            return "yellow";
+        case 'B':
+            return "blue";
+        default:
+            TraceLog(LOG_ERROR, "UTILS: Unknown face %c", face);
+            return "?";
+    }
+}
+
+char getTopNotationFromNotation (char face)
+{
+    switch (face) {
+        case 'U':
+            return 'B';
+        case 'L':
+        case 'F':
+        case 'R':
+            return 'U';
+        case 'D':
+            return 'F';
+        case 'B':
+            return 'D';
+        default:
+            TraceLog(LOG_ERROR, "UTILS: Unknown face %c", face);
             return '?';
     }
 }

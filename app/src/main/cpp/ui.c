@@ -45,7 +45,7 @@ Texture2D loadIcon (const char *path, bool invert)
 
 bool drawIconButton (int x, int y, int size, Texture2D icon, Color iconColor)
 {
-    int padding   = size / 6;
+    int padding   = size / 4;
     Rectangle src = { 0, 0, icon.width, icon.height };
     Rectangle dst = { x + padding, y + padding, size - 2 * padding, size - 2 * padding };
     DrawTexturePro(icon, src, dst, (Vector2){ 0, 0 }, 0, iconColor);
@@ -77,7 +77,7 @@ bool drawIconTextButton (int x, int y, int width, int height, Color color, char 
            && mouse_y <= y + height;
 }
 
-void drawTextBoxed (const char *text, FontStyle style, float font_size, int y)
+void drawTextBoxed (const char *text, FontStyle style, float font_size, int y, bool alignBottom)
 {
     if (strlen(text) == 0) return;
 
@@ -119,6 +119,8 @@ void drawTextBoxed (const char *text, FontStyle style, float font_size, int y)
             line_len += 1 + tlen;
     }
     line_start[line_count] = token_count;
+    int line_height        = fontMeasureY(style, font_size);
+    int first_y            = alignBottom ? y - line_count * line_height : y;
 
     for (int line = 0; line < line_count; line++) {
         int start_idx = line_start[line];
@@ -137,7 +139,7 @@ void drawTextBoxed (const char *text, FontStyle style, float font_size, int y)
 
         int line_width = fontMeasure(buf, style, font_size);
         int line_x     = (GetScreenWidth() - line_width) / 2;
-        int line_y     = y + line * fontMeasureY(style, font_size);
+        int line_y     = first_y + line * line_height;
 
         fontDraw(buf, line_x, line_y, style, font_size, RAYWHITE);
     }

@@ -6,3 +6,5 @@
 - https://www.flaticon.com/free-icon/undo_7794645 (undo icon)
 - https://www.flaticon.com/free-icon/camera_685655 (camera icon)
 - https://www.flaticon.com/free-icon/back_3114883 (back icon)
+- https://stackoverflow.com/questions/10461095/moving-application-in-background-on-back-button-event
+- https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/types.html

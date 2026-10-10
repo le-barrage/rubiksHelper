@@ -6,6 +6,8 @@
 
 #include <stdbool.h>
 
+#define UI_BLUE GetColor(0x00E0C7FF)
+
 bool drawButton (int x, int y, int width, int height, Color color, char *text, Font font);
 
 bool drawButtonPro (int x, int y, int width, int height, Color color, char *text, Font font, int fontSize,
@@ -18,6 +20,6 @@ bool drawIconButton (int x, int y, int size, Texture2D icon, Color iconColor);
 bool drawIconTextButton (int x, int y, int width, int height, Color color, char *text, Font font, int fontSize,
                          Color textColor, Texture2D icon, float roundness);
 
-void drawTextBoxed (const char *text, FontStyle style, float font_size, int y);
+void drawTextBoxed (const char *text, FontStyle style, float font_size, int y, bool alignBottom);
 
 #endif  // !UI_H

@@ -10,10 +10,18 @@ char getNotationFromColor (Color c);
 
 char getNotationFromIndex (int index);
 
+char *getColorNameFromNotation (char face);
+
+char getTopNotationFromNotation (char face);
+
 char getOrientationChar (face_t orientation);
 
 char getDirectionChar (Direction direction);
 
 Color classifyColor (Color c);
+
+bool backPressed (void);
+
+void moveAppToBackground (void);
 
 #endif  // !UTILS_H
